@@ -1,83 +1,150 @@
-const axios = require("axios");
+const axios2 = require("axios");
 
- 
- const BACKEND_URL="http://localhost:3000"
- const WS_URL= "ws://localhost:3001"
+const BACKEND_URL = "http://localhost:3000";
+const WS_URL = "ws://localhost:3001"; // Not used in these tests, but good to have
 
-//  Describe block 
+const axios = {
+    post: async (...args) => {
+        try {
+            const res = await axios2.post(...args);
+            return res;
+        } catch (e) {
+            // Axios throws on non-2xx status codes. We return the response object.
+            return e.response;
+        }
+    },
+    get: async (...args) => {
+        try {
+            const res = await axios2.get(...args);
+            return res;
+        } catch (e) {
+            return e.response;
+        }
+    },
+    put: async (...args) => {
+        try {
+            const res = await axios2.put(...args);
+            return res;
+        } catch (e) {
+            return e.response;
+        }
+    },
+    delete: async (...args) => {
+        try {
+            const res = await axios2.delete(...args);
+            return res;
+        } catch (e) {
+            return e.response;
+        }
+    },
+};
 
-describe("Authentication",()=>{
-    test("User is able to Sign Up only once",async ()=>{
-        const username="kirat"+Math.random();
-        const password="12345678"
-        const response =await axios.post(`${BACKEND_URL}/api/v1/signup`,{
+describe("Authentication", () => {
+    // This test assumes signup initially succeeds and then fails on a duplicate username.
+    // If the server's first signup fails (e.g., due to schema validation or database issues), this test will fail too.
+    test("User is able to Sign Up only once", async () => {
+        const username = `kirat_${Math.random()}@example.com`; // Ensure valid email for Zod
+        const password = "12345678";
+        const response = await axios.post(`${BACKEND_URL}/api/v1/signup`, {
             username,
             password,
-            type:"user"
-        })
-        expect(response.statusCode).toBe(200);
-        expect(response.data.userId).toBeDefined()
+            type: "user",
+        });
+        // Expect initial signup to succeed
+        expect(response.status).toBe(200);
+        expect(response.data.userId).toBeDefined();
 
-        //Now he should not signup again
-        const updatedResponse =await axios.post(`${BACKEND_URL}/api/v1/signup`,{
+        // Now he should not signup again with the same username
+        const updatedResponse = await axios.post(`${BACKEND_URL}/api/v1/signup`, {
             username,
             password,
-            type:"user"
-        })
+            type: "user",
+        });
 
-        expect(updatedResponse.statusCode).toBe(400)
+        // Expect duplicate signup to fail (e.g., with 400 for "User already exists")
+        expect(updatedResponse.status).toBe(400);
+        expect(updatedResponse.data.message).toBe("User already exists"); // Check the actual message
+    });
 
-    })
-
-    test("Signup Request Fails if the Username is Empty",async()=>{
-        const username="kirat"+Math.random();
-        const password="12345678"
-        const response=await axios.post(`${BACKEND_URL}/api/v1/signup`,{
+    test("Signup Request Fails if the Username is Empty or Invalid", async () => {
+        // Test case for missing username (Zod validation should catch this)
+        const password = "12345678";
+        const responseNoUsername = await axios.post(`${BACKEND_URL}/api/v1/signup`, {
             password,
-            type:"admin"
-        })
-        expect(response.statusCode).toBe(400);
-        expect(response.data.userId).toBeDefined()
-    })
-    
+            type: "admin",
+        });
+        expect(responseNoUsername.status).toBe(400);
+        // Expect a validation message, not userId
+        expect(responseNoUsername.data.message).toBe("Validation failed");
 
-    test('SignIn Succeds if the username and password are correct',async () => {
-        const username="kirat"+Math.random();
-        const password='12345678'
-        await axios.post(`${BACKEND_URL}/api/v1/signup`,{
+        // Test case for invalid username format (e.g., not an email)
+        const invalidUsername = "notanemail";
+        const responseInvalidUsername = await axios.post(`${BACKEND_URL}/api/v1/signup`, {
+            username: invalidUsername,
+            password,
+            type: "user",
+        });
+        expect(responseInvalidUsername.status).toBe(400);
+        expect(responseInvalidUsername.data.message).toBe("Validation failed");
+    });
+
+    test('SignIn Succeeds if the username and password are correct', async () => {
+        const username = `kirat_signin_${Math.random()}@example.com`; // Ensure valid email
+        const password = '12345678';
+
+        // First, sign up the user
+        const signupResponse = await axios.post(`${BACKEND_URL}/api/v1/signup`, {
             username,
             password,
-            type:"user"
-        })
+            type: "user"
+        });
+        // Ensure signup was successful before attempting signin
+        expect(signupResponse.status).toBe(200);
+        expect(signupResponse.data.userId).toBeDefined();
 
-        const response=await axios.post(`${BACKEND_URL}/api/v1/signin`,{
+        // Then, attempt to sign in
+        const signinResponse = await axios.post(`${BACKEND_URL}/api/v1/signin`, {
             username,
             password
-        })
-        expect(response.statusCode).toBe(200)
-        expect(response.body.token).toBeDefined()
+        });
+        expect(signinResponse.status).toBe(200);
+        // Axios puts response data in `.data`, not `.body`
+        expect(signinResponse.data.token).toBeDefined();
+    });
 
-    })
 
+    test('SignIn fails if the username and password are wrong', async () => {
+        const username = `kirat_wrong_pass_${Math.random()}@example.com`; // Ensure valid email
+        const password = '12345678';
+        const wrongPassword = 'wrong_password';
 
-    test('SignIn fails if the username and password are wrong',async () => {
-        const username="kirat"+Math.random();
-        const password='12345678'
-
-        await axios.post(`${BACKEND_URL}/api/v1/signup`,{
+        // First, sign up a user to test against
+        const signupResponse = await axios.post(`${BACKEND_URL}/api/v1/signup`, {
             username,
-            password
-        })
-        expect(response.data.userId).toBeDefined()
+            password,
+            type: "user"
+        });
+        // Ensure signup was successful
+        expect(signupResponse.status).toBe(200);
+        expect(signupResponse.data.userId).toBeDefined();
 
-        const response=await axios.post(`${BACKEND_URL}/api/v1/signin`,{
-            username:"WrongUsername",
-            password
-        })
-        expect(response.statusCode).toBe(403)
+        // Attempt sign in with wrong password
+        const signinResponseWrongPassword = await axios.post(`${BACKEND_URL}/api/v1/signin`, {
+            username,
+            password: wrongPassword
+        });
+        expect(signinResponseWrongPassword.status).toBe(403); // Expected status for invalid password
+        expect(signinResponseWrongPassword.data.message).toBe("Invalid password"); // Check server message
 
-    })
-})
+        // Attempt sign in with wrong username
+        const signinResponseWrongUsername = await axios.post(`${BACKEND_URL}/api/v1/signin`, {
+            username: "WrongUsername@example.com", // Ensure it's an email format for Zod validation
+            password
+        });
+        expect(signinResponseWrongUsername.status).toBe(403); // Expected status for user not found
+        expect(signinResponseWrongUsername.data.message).toBe("User not found"); // Check server message
+    });
+});
 
 describe("User Information Endpoint",()=>{
     let token="";
@@ -123,7 +190,7 @@ describe("User Information Endpoint",()=>{
             }
         })
 
-        expect(response.statusCode).toBe(400) 
+        expect(response.status).toBe(400) 
     })
 
     test("user Can update their metadata with the right avatar id",async()=>{
@@ -135,7 +202,7 @@ describe("User Information Endpoint",()=>{
             }
         })
 
-        expect(response.statusCode).toBe(200) 
+        expect(response.status).toBe(200) 
     })
 
     test("User is not able to update their metadata if auth is header is not present",async()=>{
@@ -143,7 +210,7 @@ describe("User Information Endpoint",()=>{
             avatarId
         })
 
-        expect(response.statusCode).toBe(403) 
+        expect(response.status).toBe(403) 
     })
 
     test("Get back Avatar Information for the User",async ()=>{
@@ -309,7 +376,7 @@ describe("Space Information",()=>{
             }
         })
 
-        expect(response.statusCode).toBe(400)
+        expect(response.status).toBe(400)
 
     })
 
@@ -320,7 +387,7 @@ describe("Space Information",()=>{
             }
         })
 
-        expect(response.statusCode).toBe(400)
+        expect(response.status).toBe(400)
 
     })
 
@@ -340,7 +407,7 @@ describe("Space Information",()=>{
             }
         })
 
-        expect(deleResponse.statusCode).toBe(200)
+        expect(deleResponse.status).toBe(200)
 
     })
 
@@ -361,7 +428,7 @@ describe("Space Information",()=>{
             }
         })
 
-        expect(deleResponse.statusCode).toBe(400)
+        expect(deleResponse.status).toBe(400)
     })
     
 
