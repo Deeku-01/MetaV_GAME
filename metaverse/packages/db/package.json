@@ -1,7 +1,10 @@
 {
-  "name": "db",
+  "name": "@repo/db",
   "version": "1.0.0",
   "main": "dist/index.js",
+  "exports": {
+    "./db": "./src/prisma.ts"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
