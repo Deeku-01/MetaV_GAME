@@ -15,6 +15,10 @@ export const UpdateMetaDataSchema=z.object({
     avatarId:z.string()
 })
 
+export const DeleteElementSchema = z.object({
+    id: z.string(),
+})
+
 export const CreateSpaceSchema=z.object({
     name:z.string(),
     dimensions:z.string().regex(/^[0-9]{1,4}x[0-9]{1,4}$/),
@@ -53,4 +57,17 @@ export const CreateMapSchema=z.object({
         y:z.number()
     }))
 })
+
+
+declare global
+{
+    namespace Express{
+        export interface Request{
+            roel?:"Admin" | "User",
+            userId?:string
+        }
+    }
+}
+
+
 
